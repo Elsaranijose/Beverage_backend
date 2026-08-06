@@ -6,7 +6,9 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed": "node src/migrations/seed-admin.js",
+    "seed:cocktails": "node src/migrations/seed-cocktails.js"
   },
   "engines": {
     "node": ">=18"
