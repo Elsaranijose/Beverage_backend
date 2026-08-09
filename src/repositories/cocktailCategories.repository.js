@@ -80,4 +80,8 @@ async function updateCount(slug, count) {
   ]);
 }
 
-module.exports = { findAll, upsert, remove, updateCount };
+async function clearComingSoon(slug) {
+  await query(`UPDATE cocktail_categories SET coming_soon = 0 WHERE slug = ?`, [slug]);
+}
+
+module.exports = { findAll, upsert, remove, updateCount, clearComingSoon };

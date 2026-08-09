@@ -73,4 +73,23 @@ async function getUserById(id, { includeInactive = false } = {}) {
   return user;
 }
 
-module.exports = { login, register, getUserById, signToken };
+async function changePassword(userId, oldPassword, newPassword) {
+  await usersRepo.ensureSchema();
+  if (!oldPassword || !newPassword) {
+    return { ok: false, message: "Both current and new passwords are required" };
+  }
+  if (String(newPassword).length < 6) {
+    return { ok: false, message: "New password must be at least 6 characters" };
+  }
+  const rows = await query("SELECT password_hash FROM users WHERE id = ? LIMIT 1", [userId]);
+  if (!rows[0]) return { ok: false, message: "User not found" };
+
+  const match = await bcrypt.compare(oldPassword, rows[0].password_hash);
+  if (!match) return { ok: false, message: "Incorrect current password" };
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  await query("UPDATE users SET password_hash = ? WHERE id = ?", [hash, userId]);
+  return { ok: true, message: "Password updated successfully" };
+}
+
+module.exports = { login, register, getUserById, signToken, changePassword };

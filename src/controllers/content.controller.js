@@ -120,7 +120,12 @@ module.exports = {
     try {
       const counts = await classicRepo.countByDivision();
       const slug = saved.divisionSlug || "classic-cocktails";
-      await categoriesRepo.updateCount(slug, counts[slug] || 0);
+      const newCount = counts[slug] || 0;
+      await categoriesRepo.updateCount(slug, newCount);
+      // Auto-unlock: if this division now has cocktails, clear coming_soon
+      if (newCount > 0) {
+        await categoriesRepo.clearComingSoon(slug);
+      }
     } catch {
       /* count sync is best-effort */
     }

@@ -45,4 +45,16 @@ async function me(req, res) {
   }
 }
 
-module.exports = { login, register, me };
+async function changePassword(req, res) {
+  try {
+    const { oldPassword, newPassword } = req.body || {};
+    const result = await authService.changePassword(req.user.userId, oldPassword, newPassword);
+    if (!result.ok) return res.status(400).json(result);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to change password" });
+  }
+}
+
+module.exports = { login, register, me, changePassword };

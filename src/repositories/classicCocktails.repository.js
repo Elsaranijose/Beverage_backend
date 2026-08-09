@@ -98,6 +98,7 @@ async function countByDivision() {
   const rows = await query(
     `SELECT division_slug AS slug, COUNT(*) AS count
      FROM classic_cocktails
+     WHERE status = 'published'
      GROUP BY division_slug`,
   );
   const out = {};
