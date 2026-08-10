@@ -3,6 +3,16 @@ const jwt = require("jsonwebtoken");
 const { randomUUID } = require("crypto");
 const { query } = require("../config/db");
 const usersRepo = require("../repositories/users.repository");
+const passwordResetRepo = require("../repositories/passwordReset.repository");
+const { sendPasswordResetEmail } = require("./mail.service");
+
+function getFrontendBaseUrl() {
+  const raw =
+    process.env.FRONTEND_URL ||
+    process.env.APP_URL ||
+    "http://localhost:3000";
+  return String(raw).replace(/\/$/, "");
+}
 
 function signToken(user) {
   return jwt.sign(
@@ -92,4 +102,95 @@ async function changePassword(userId, oldPassword, newPassword) {
   return { ok: true, message: "Password updated successfully" };
 }
 
-module.exports = { login, register, getUserById, signToken, changePassword };
+/**
+ * Request a password reset email.
+ * Returns an explicit error if the email is not registered (per product request).
+ */
+async function forgotPassword(email) {
+  await usersRepo.ensureSchema();
+  await passwordResetRepo.ensureSchema();
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { ok: false, message: "Enter a valid email address." };
+  }
+
+  const rows = await query(
+    "SELECT id, email, full_name, status FROM users WHERE email = ? LIMIT 1",
+    [normalizedEmail],
+  );
+  const user = rows[0];
+  if (!user) {
+    return { ok: false, message: "This email is not registered." };
+  }
+  if (user.status === "inactive") {
+    return {
+      ok: false,
+      message: "This account has been deactivated. Contact support.",
+    };
+  }
+
+  const rawToken = await passwordResetRepo.createToken(user.id, 60);
+  const resetUrl = `${getFrontendBaseUrl()}/reset-password/${rawToken}`;
+
+  try {
+    await sendPasswordResetEmail({
+      to: user.email,
+      resetUrl,
+      fullName: user.full_name,
+    });
+  } catch (err) {
+    console.error("[forgotPassword] email send failed:", err.message || err);
+    return {
+      ok: false,
+      message:
+        "We could not send the reset email right now. Please try again in a few minutes.",
+    };
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[forgotPassword] reset link for ${user.email}: ${resetUrl}`);
+  }
+
+  return {
+    ok: true,
+    message: "Password reset link sent. Check your email inbox (and spam folder).",
+  };
+}
+
+async function resetPassword(token, newPassword) {
+  await usersRepo.ensureSchema();
+  await passwordResetRepo.ensureSchema();
+
+  if (!newPassword || String(newPassword).length < 6) {
+    return { ok: false, message: "Password must be at least 6 characters" };
+  }
+
+  const record = await passwordResetRepo.findValidToken(token);
+  if (!record) {
+    return {
+      ok: false,
+      message: "This reset link is invalid or has expired. Request a new one.",
+    };
+  }
+
+  const hash = await bcrypt.hash(String(newPassword), 10);
+  await query("UPDATE users SET password_hash = ? WHERE id = ?", [hash, record.user_id]);
+  await passwordResetRepo.markUsed(record.id);
+  await passwordResetRepo.invalidateOpenTokens(record.user_id);
+
+  return {
+    ok: true,
+    message: "Password updated. You can log in with your new password.",
+  };
+}
+
+module.exports = {
+  login,
+  register,
+  getUserById,
+  signToken,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+};

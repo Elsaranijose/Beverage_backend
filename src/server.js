@@ -29,7 +29,8 @@ app.use(
       if (!origin || allowedOrigins.has(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      // Reject without throwing — throwing becomes a 500 "Unexpected server error"
+      return callback(null, false);
     },
     credentials: true,
   }),

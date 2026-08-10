@@ -57,4 +57,45 @@ async function changePassword(req, res) {
   }
 }
 
-module.exports = { login, register, me, changePassword };
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body || {};
+    const result = await authService.forgotPassword(email);
+    if (!result.ok) {
+      const status =
+        /not registered/i.test(result.message || "")
+          ? 404
+          : /deactivated/i.test(result.message || "")
+            ? 403
+            : /could not send/i.test(result.message || "")
+              ? 503
+              : 400;
+      return res.status(status).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to start password reset" });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { token, password, newPassword } = req.body || {};
+    const result = await authService.resetPassword(token, password || newPassword);
+    if (!result.ok) return res.status(400).json(result);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to reset password" });
+  }
+}
+
+module.exports = {
+  login,
+  register,
+  me,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+};
