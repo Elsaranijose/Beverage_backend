@@ -16,23 +16,32 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 
+/** Always allow live site + local dev, plus anything in CORS_ORIGIN env. */
 const allowedOrigins = new Set(
-  [CORS_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000"]
+  [
+    CORS_ORIGIN,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://beveragevaults.com",
+    "https://www.beveragevaults.com",
+  ]
     .filter(Boolean)
-    .flatMap((v) => String(v).split(",").map((s) => s.trim())),
+    .flatMap((v) => String(v).split(",").map((s) => s.trim()).filter(Boolean)),
 );
 
 app.use(
   cors({
     origin(origin, callback) {
-      // Allow same-origin / tools with no Origin header, plus local Next.js hosts
+      // Allow same-origin / server-to-server (no Origin) and listed frontends
       if (!origin || allowedOrigins.has(origin)) {
         return callback(null, true);
       }
-      // Reject without throwing — throwing becomes a 500 "Unexpected server error"
+      console.warn(`[cors] blocked origin: ${origin}`);
       return callback(null, false);
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 app.use(express.json({ limit: "2mb" }));
