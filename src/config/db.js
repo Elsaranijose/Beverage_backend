@@ -3,15 +3,26 @@ const mysql = require("mysql2/promise");
 
 let pool;
 
+function resolveDbHost() {
+  const configured = (process.env.DB_HOST || "").trim();
+
+  // Hostinger / Linux: keep "localhost" — MySQL users are often granted as user@localhost
+  // (connecting as 127.0.0.1 is treated as a different host and gets "Access denied").
+  if (configured) {
+    if (configured === "localhost" && process.platform === "win32") {
+      return "127.0.0.1";
+    }
+    return configured;
+  }
+
+  // Defaults when DB_HOST is unset
+  return process.platform === "win32" ? "127.0.0.1" : "localhost";
+}
+
 function getPool() {
   if (!pool) {
-    // Prefer 127.0.0.1 over "localhost" on Windows (avoids IPv6 stalls).
-    const host =
-      process.env.DB_HOST === "localhost"
-        ? "127.0.0.1"
-        : process.env.DB_HOST || "127.0.0.1";
     pool = mysql.createPool({
-      host,
+      host: resolveDbHost(),
       port: Number(process.env.DB_PORT || 3306),
       user: process.env.DB_USER || "root",
       password: process.env.DB_PASSWORD || "",
