@@ -20,3 +20,7 @@ Thumbs.db
 # Coverage / build
 coverage/
 dist/
+
+# Uploaded media (stored on Hostinger disk in production)
+uploads/
+

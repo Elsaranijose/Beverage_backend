@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 
@@ -11,10 +13,15 @@ const classicRoutes = require("./routes/classicCocktails.routes");
 const signatureRoutes = require("./routes/signatureCocktails.routes");
 const videosRoutes = require("./routes/videos.routes");
 const cocktailCategoriesRoutes = require("./routes/cocktailCategories.routes");
+const uploadsRoutes = require("./routes/uploads.routes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
+
+const uploadsRoot = path.join(process.cwd(), "uploads");
+fs.mkdirSync(path.join(uploadsRoot, "images"), { recursive: true });
+fs.mkdirSync(path.join(uploadsRoot, "documents"), { recursive: true });
 
 /** Always allow live site + local dev, plus anything in CORS_ORIGIN env. */
 const allowedOrigins = new Set(
@@ -46,6 +53,10 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 
+// Persist admin uploads on Hostinger disk (Vercel cannot write lasting files)
+app.use("/images/uploads", express.static(path.join(uploadsRoot, "images")));
+app.use("/documents/articles", express.static(path.join(uploadsRoot, "documents")));
+
 app.get("/", (_req, res) => {
   res.json({
     name: "Beverage Vault API",
@@ -64,9 +75,13 @@ app.use("/api/classic-cocktails", classicRoutes);
 app.use("/api/signature-cocktails", signatureRoutes);
 app.use("/api/videos", videosRoutes);
 app.use("/api/cocktail-categories", cocktailCategoriesRoutes);
+app.use("/api/uploads", uploadsRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
+  if (err && err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ message: "File is too large (max 15MB)" });
+  }
   res.status(500).json({ message: "Unexpected server error" });
 });
 
