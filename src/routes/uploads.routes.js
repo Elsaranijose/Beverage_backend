@@ -55,6 +55,27 @@ const upload = multer({
   limits: { fileSize: MAX_DOC_BYTES },
 });
 
+/** Live: https://api.beveragevaults.com — so Vercel can load files without private-IP rewrites. */
+function publicBaseUrl(req) {
+  const configured = (
+    process.env.PUBLIC_API_URL ||
+    process.env.API_PUBLIC_URL ||
+    ""
+  ).trim().replace(/\/$/, "");
+  if (configured) return configured;
+  const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "http");
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").trim();
+  if (host && !host.includes("localhost") && !host.startsWith("127.")) {
+    return `${proto}://${host}`;
+  }
+  return "";
+}
+
+function mediaUrl(req, pathname) {
+  const base = publicBaseUrl(req);
+  return base ? `${base}${pathname}` : pathname;
+}
+
 router.post("/", authRequired, adminOnly, upload.single("file"), (req, res) => {
   try {
     ensureDirs();
@@ -79,10 +100,11 @@ router.post("/", authRequired, adminOnly, upload.single("file"), (req, res) => {
 
       const filename = `${Date.now()}-${randomBytes(4).toString("hex")}.${ext}`;
       fs.writeFileSync(path.join(DOC_DIR, filename), file.buffer);
+      const pathname = `/documents/articles/${filename}`;
 
       return res.json({
         ok: true,
-        url: `/documents/articles/${filename}`,
+        url: mediaUrl(req, pathname),
         fileName: file.originalname,
       });
     }
@@ -99,10 +121,11 @@ router.post("/", authRequired, adminOnly, upload.single("file"), (req, res) => {
     const ext = imageExt(file.mimetype, file.originalname);
     const filename = `${Date.now()}-${randomBytes(4).toString("hex")}.${ext}`;
     fs.writeFileSync(path.join(IMAGE_DIR, filename), file.buffer);
+    const pathname = `/images/uploads/${filename}`;
 
     return res.json({
       ok: true,
-      url: `/images/uploads/${filename}`,
+      url: mediaUrl(req, pathname),
     });
   } catch (err) {
     console.error("[upload]", err);
